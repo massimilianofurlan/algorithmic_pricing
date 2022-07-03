@@ -18,10 +18,10 @@ println("initializing global variables...")
 const configfile = TOML.parsefile("config.toml")
 const config = configfile["two_agents"]
 # input validation
-#input_validation(config["a"],config["c"])			# firms must be symmetric Anderson and De Palma
+input_validation(config["a"],config["c"])			# firms must be symmetric Anderson and De Palma
 
 # demand and agents
-const a = Float32.(config["a"])						
+const a = Float32.(config["a"])
 const c = Float32.(config["c"])
 const a0 = Float32.(config["a0"])
 const mu = Float32(config["mu"])
@@ -36,21 +36,22 @@ const q_init_mode = config["q_init_mode"]
 
 # experiment
 const n_prices = Int8(config["n_prices"])
-const p_nash = config["p_nash"]	 				# lowest nash price is the (p-nash)-th price
+const p_nash = config["p_nash"]		 			# lowest nash price is the (p-nash)-th price
 const p_coop = n_prices .- p_nash .+ 1			# highest coop price is the (p-coop)-th price
 const price_numbers = Int8.(collect(1:n_prices))
+const c_part = config["c_part"]
 const memory_length = config["memory_length"]
-const one_memory_n_states = Int32(n_prices)^n_agents
-const n_states = one_memory_n_states^memory_length
+const one_memory_n_states = Int32(n_prices) * Int32(length(c_part))^(n_agents-1) 
+const n_states = one_memory_n_states^memory_length	# max 2^31 - 1 states Int32
 
 const n_sessions = config["n_sessions"]
 const max_epochs = config["max_epochs"]
 const n_episodes = config["n_episodes"]
 const convergence_target = config["convergence_target"]
-const max_cycle_length = n_states + 1																			# after n_real_states + 1 agents must visit one already visited (non coarse) state	
 
-const beta = ifelse(any(config["intensity"] .== 0.0), config["beta"],  1 .- 1 ./ (config["intensity"]*n_states*n_prices))
-const intensity = Float32.(1 ./ ((1 .- beta) * n_states * n_prices))
+const beta = ifelse(config["nu"] == zeros(n_agents), config["beta"], get_beta.(config["nu"]))
+const nu = Float32.(1 ./ (n_prices * n_states) .* beta ./ (1 .- beta.^(n_agents+1)))
+
 const eps0 = config["eps0"]
 const epsilon = [[eps0 .* beta.^(t-1) for t in (T-1)*n_episodes+1:T*n_episodes] for T in 1:max_epochs]
 
@@ -75,19 +76,18 @@ show_experiment_details()
 
 include("convergence_analysis.jl")
 include("impulse_response.jl")
-include("Q_error.jl")
 
 function begin_simulation()
-	last_memory = Array{Int32,2}(undef, max(1,memory_length), n_sessions)
+	last_memory = Array{Int32,3}(undef, n_agents, max(1,memory_length), n_sessions)
 	last_epoch = Array{Int32,1}(undef, n_sessions)
-	greedy_policy = Array{Int8,3}(undef, n_states, n_agents, n_sessions)
+	greedy_policy = Array{Int32,3}(undef, n_states, n_agents, n_sessions)
 	Q = Array{Float32,4}(undef, n_states, n_prices, n_agents, n_sessions)
 	epoch_profits = Array{Float32,3}(undef, max_epochs, n_agents, n_sessions)
 
 	println("running the experiment...")	
 	progress = Progress(n_sessions, color=:white, showspeed=true)
 	@time Threads.@threads for z in 1:n_sessions
-		last_memory[:,z], last_epoch[z], greedy_policy[:,:,z], Q[:,:,:,z], epoch_profits[:,:,z] = learning_simulation(z)
+		last_memory[:,:,z], last_epoch[z], greedy_policy[:,:,z], Q[:,:,:,z], epoch_profits[:,:,z] = learning_simulation(z)
 		next!(progress)
 	end
 
@@ -95,16 +95,15 @@ function begin_simulation()
 	@time converged, n_converged, cycle_states, cycle_prices, cycle_profits, cycle_length, profit_gains = convergence_analysis(last_epoch, last_memory, greedy_policy)
 	println("computing impulse reponses...")
 	@time indiv_ir_price, aggr_ir_price, dev_gains, mean_dev_gains, returned_to_cycle = gen_impulse_response(last_memory, greedy_policy, cycle_prices, cycle_states, cycle_profits, cycle_length, converged)
-	println("computing deviation gains...")
-	@time dev_gains_matrix, returned_to_cycle_matrix, share_unprofitable_matrix = gen_deviation_matrix(last_memory, greedy_policy, cycle_prices, cycle_states, cycle_profits, cycle_length, converged)
-	println("computing errors on equilibrium path...")
- 	@time Q_error, on_path_Q_errors, on_path_policy_errors, on_path_Q_losses = Q_error_analysis(Q, greedy_policy, converged, cycle_prices, cycle_states, cycle_length)
+	println("compute dynamic best responses (errors in equilibrium)")
+	@time on_path_policy_errors, on_path_Q_losses, on_path_Q_error, is_nash = get_Q_errors(Q, last_memory, greedy_policy, cycle_prices, cycle_states, cycle_profits, cycle_length, converged)
 
-	txt_write(converged, last_epoch, profit_gains, mean_dev_gains, cycle_length, returned_to_cycle,on_path_Q_errors, on_path_policy_errors, on_path_Q_losses)
-	tex_write(dev_gains_matrix, returned_to_cycle_matrix, share_unprofitable_matrix)
-	save_results(last_memory, last_epoch, greedy_policy, Q, epoch_profits, converged, 
+	txt_write(converged, last_epoch, profit_gains, mean_dev_gains, cycle_length, returned_to_cycle, on_path_policy_errors, on_path_Q_losses, on_path_Q_error, is_nash)
+
+	results = save_results(last_memory, last_epoch, greedy_policy, Q, epoch_profits, converged, 
 				cycle_states, cycle_prices, cycle_profits, cycle_length, profit_gains,
-				indiv_ir_price, aggr_ir_price, dev_gains, returned_to_cycle)
+				indiv_ir_price, aggr_ir_price, dev_gains, returned_to_cycle, 
+				on_path_policy_errors, on_path_Q_losses, on_path_Q_error, is_nash)
 end
 
 results = begin_simulation()

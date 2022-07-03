@@ -1,16 +1,17 @@
 
-function gen_impulse_response(last_memory::Array{Int32,2}, greedy_policy::Array{Int8,3}, cycle_prices::Array{Int8,3}, cycle_states::Array{Int32,2}, cycle_profits::Array{NTuple{n_agents,Float32},2}, cycle_length::Array{Int32,1}, converged::Array{Bool})
+function gen_impulse_response(last_memory::Array{Int32,3}, greedy_policy::Array{Int32,3}, cycle_prices::Array{Int8,3}, cycle_states::Array{Int32,3}, cycle_profits::Array{NTuple{n_agents,Float32},2}, cycle_length::Array{Int32,1}, converged::Array{Bool}; dev_type = dev_type)
 	# generate impulse responses = [pre, shock, post, new_cycle] as ir_length x n_agents arrays
 	# pre -> convergence prices/profits, shock -> exogenous shock prices/profits, 
 	# post -> response to shock, new_cycle -> new convergence cycle (this may well be the same cycle as pre)
 	# impulse responses parts are arrays of dimension n_sessions,                                      		-> even non converged session are analyzed
 	# whose elements contain a matrix of dimension n_agents x cycle_length[z],                          	-> exogenous deviation by each agent in each episode of convergence cycle
 	# whose elements contain a matrix of dimension ir_(shock/post/new_cycle)_length x n_agents          	-> each row is an episode of the ir, each column is an agent
+	max_cycle_length = Int32(n_prices)^(n_agents*memory_length) + 1											# after n_real_states + 1 agents must visit one already visited (non coarse) state	
 	shock_prices_ = Array{Float32,2}(undef, maximum(cycle_length)+dev_length-1, n_agents)
 	shock_profits_ = Array{Float32,2}(undef, maximum(cycle_length)+dev_length-1, n_agents)	
 	post_prices_ = Array{Float32,2}(undef, max_cycle_length, n_agents)
 	post_profits_ = Array{Float32,2}(undef, max_cycle_length, n_agents)
-	visited_states_ = Array{Int32,1}(undef, max_cycle_length)	
+	visited_states_ = Array{Int32,2}(undef, max_cycle_length, n_agents)	
 	pre_prices = Array{Matrix{Float32},1}(undef, n_sessions)
 	pre_profits = Array{Matrix{Float32},1}(undef, n_sessions)
 	shock_prices = [Array{Matrix{Float32},2}(undef, cycle_length[z], n_agents) for z in 1:n_sessions]  
@@ -35,17 +36,19 @@ function gen_impulse_response(last_memory::Array{Int32,2}, greedy_policy::Array{
 				if dev_type in 1:n_prices
 					dev_p = dev_type																		# deviate to dev_type price
 				elseif dev_type in -(1:n_prices)
-					dev_p = max(greedy_policy[cycle_states[dev_t,z],dev_agent,z] + dev_type, 1)				# decrease price by dev_type units 
+					dev_p = max(greedy_policy[cycle_states[dev_t,dev_agent,z],dev_agent,z] + dev_type, 1)	# decrease price by dev_type units 
 				elseif dev_type == 0
-					dev_p = get_static_best_response(greedy_policy[:,:,z], cycle_states[dev_t,z], dev_agent)# deviate to static BR to future opponent price
-				else
-					dev_p = get_dynamic_best_response(greedy_policy[:,:,z], last_memory[:,z], dev_agent, dev_t, 
+					dev_p = get_static_best_response(greedy_policy[:,:,z], cycle_states[dev_t,:,z], dev_agent)# deviate to static BR to future opponent price
+				elseif dev_type > n_prices
+					dev_p = get_dynamic_best_response(greedy_policy[:,:,z], last_memory[:,:,z], dev_agent, dev_t, 
 														shock_prices_, shock_profits_, post_prices_, post_profits_, visited_states_)
+				elseif dev_type < -n_prices
+					dev_p = greedy_policy[cycle_states[dev_t,dev_agent,z],dev_agent,z]						# no deviation
 				end
 				# generate impulse response for (all, even non-converged) session z, with deviating agent dev_agent and at episode dev_t of convergence cycle
 				shock_prices[z][dev_t,dev_agent], post_prices[z][dev_t,dev_agent], new_cycle_prices[z][dev_t,dev_agent],
 				shock_profits[z][dev_t,dev_agent], post_profits[z][dev_t,dev_agent], new_cycle_profits[z][dev_t,dev_agent], 
-				new_cycle_length = gen_individual_ir(last_memory[:,z], greedy_policy[:,:,z], dev_agent, dev_p, dev_t,
+				new_cycle_length = gen_individual_ir(last_memory[:,:,z], greedy_policy[:,:,z], dev_agent, dev_p, dev_t,
 														shock_prices_, shock_profits_, post_prices_, post_profits_, visited_states_)
 				# pack together impulse response pieces
 				indiv_ir_price[z][dev_t,dev_agent] = build_individual_ir(pre_prices[z], shock_prices[z][dev_t,dev_agent], 
@@ -77,17 +80,18 @@ function get_static_best_response(greedy_policy, state, dev_agent)
 	# compute dev_agent static best response given opponents' convergence strategies and current state
 	# static best response maximizes the instantaneous payoff given opponent prices
 	profits = Array{Float32}(undef, n_prices);
-	p = greedy_policy[state,:]                    					# get the greedy price in state state
+	p = get_price(state, greedy_policy)                     		# get the greedy price in state state
 	for j in 1:n_prices
 		p[dev_agent] = j                                        	# dev_agent tries all the prices 
 		profits[j] = get_expected_profits(p)[dev_agent]          	# and looks at the profits she obtains given her opponent plays according to her greedy policy 
 	end
 	return minimum(argmax(profits))                            		# get lowest best price    
-	#greedy_policy[cycle_states[dev_t,z],dev_agent,z] 				#no deviation, testing purposes
+	#greedy_policy[cycle_states[dev_t,:,z],dev_agent,z] 			#no deviation, testing purposes
 end
 
 
 function get_dynamic_best_response(greedy_policy, memory, dev_agent, dev_t, shock_prices, shock_profits, post_prices, post_profits, visited_states; dev_length = dev_length)
+	# compute the true Q(s,:) given agents' strategies and do argmax Q(s,:)
 	d_profits = Array{Float32}(undef, n_prices);	
 	for dev_p in 1:n_prices
 		shock_profits, pre_cycle_profits, cycle_profits, 
@@ -111,11 +115,12 @@ end
 function gen_individual_ir(memory, greedy_policy, dev_agent, dev_p, dev_t, 
 							shock_prices, shock_profits, post_prices, post_profits, visited_states; dev_length = dev_length)
 	# generate impulse response for a given deviating agent deviating at the dev_t-the episode of convergence cycle
+	max_cycle_length = Int32(n_prices)^(n_agents*memory_length) + 1					# after n_real_states + 1 agents must visit one already visited (non coarse) state
 	shock_length = dev_t + dev_length - 1                                     		# agent reaches dev_t, then shocks for dev_length episodes
 	# shock period
 	state = get_state_number(memory)                                           		# resume session
 	for t in 1:shock_length
-		p = greedy_policy[state,:]                                					# get best prices given convergence strategies
+		p = get_price(state, greedy_policy)                                			# get best prices given convergence strategies
 		if t >= dev_t                                                          		# deviating from dev_t over
 			p[dev_agent] = dev_p                                               		# deviating agent choses deviating price
 		end
@@ -126,16 +131,16 @@ function gen_individual_ir(memory, greedy_policy, dev_agent, dev_p, dev_t,
 	# post-shock period
 	post_end, post_length = undef, undef
 	for t in 1:max_cycle_length
-		p = greedy_policy[state,:]                                					# apply optimal greedy_policy
+		p = get_price(state, greedy_policy)       	                         		# apply optimal greedy_policy
 		post_prices[t,:] = [prices[p[i],i] for i in 1:n_agents]
 		post_profits[t,:] = get_expected_profits(p)   	
 		state = get_next_state(memory, p)                                      		# state <- next_state		
-		post_end = isvisited(view(visited_states,1:t-1), state)						# returns when visited if visited
+		post_end = isvisited(view(visited_states,1:t-1,:), state)					# returns when visited if visited
 		if post_end != undef                                                		# break if state already visited
 			post_length = t
 			break
 		end     
-		visited_states[t] = state													
+		visited_states[t,:] = state													
 	end
 
 	shock_prices_ = view(shock_prices,1:shock_length,:)
@@ -165,7 +170,7 @@ function is_returned_to_cycle(pre_price, new_cycle_price, cycle_length, new_cycl
 	new_cycle_length != cycle_length && return false
 	for t in 1:new_cycle_length
 		isequal(new_cycle_price,pre_price) && return true
-		new_cycle_price = circshift(new_cycle_price,1)								# cycle do not necessairly start at the same price, circshift prices anc check again
+		new_cycle_price = circshift(new_cycle_price,1)				# cycle do not necessairly start at the same price, circshift prices anc check again
 	end
 	return false
 end
@@ -252,49 +257,38 @@ function build_aggregate_ir(pre, shock, post, new_cycle, cycle_length, converged
 end
 
 
-function gen_deviation_matrix(last_memory::Array{Int32,2}, greedy_policy::Array{Int8,3}, cycle_prices::Array{Int8,3}, cycle_states::Array{Int32,2}, cycle_profits::Array{NTuple{n_agents,Float32},2}, cycle_length::Array{Int32,1}, converged::Array{Bool})
-	n_agents == 2 || return nothing, nothing, nothing
+function get_Q_errors(Q, last_memory, greedy_policy, cycle_prices, cycle_states, cycle_profits, cycle_length, converged)
+	# compute Q errors on path in percentage terms 
+	max_cycle_length = Int32(n_prices)^(n_agents*memory_length) + 1	
 	shock_prices_ = Array{Float32,2}(undef, maximum(cycle_length)+dev_length-1, n_agents)
 	shock_profits_ = Array{Float32,2}(undef, maximum(cycle_length)+dev_length-1, n_agents)	
 	post_prices_ = Array{Float32,2}(undef, max_cycle_length, n_agents)
 	post_profits_ = Array{Float32,2}(undef, max_cycle_length, n_agents)
-	visited_states_ = Array{Int32,1}(undef, max_cycle_length)		
-	pre_prices = Array{Matrix{Float32},1}(undef, n_sessions)
-	pre_profits = Array{Matrix{Float32},1}(undef, n_sessions)
-	dev_matrix = [[[] for dev_p in 1:pre_p-1] for pre_p in 1:n_prices]
-	ret_matrix = [[[] for dev_p in 1:pre_p-1] for pre_p in 1:n_prices]
-	for z in collect(1:n_sessions)[converged][cycle_length[converged] .<= 2]								# only study sessions converged to constant prices
-		# pre-shock analysis
-		pre_prices[z] = [prices[cycle_prices[t,i,z],i] for t in 1:cycle_length[z], i in 1:n_agents]     	# get prices at convergence
-		pre_profits[z] = [cycle_profits[t,z][i] for t in 1:cycle_length[z], i in 1:n_agents]            	# get profits at convergence
-		# shock and post shock analysis
-		for dev_agent in 1:n_agents                                                                     	# loop over shocking agent                   
-			for dev_t in 1:cycle_length[z]                                                             		# loop over episodes in cycle
-				pre_p = greedy_policy[cycle_states[dev_t,z],dev_agent,z]									# get pre_deviation price
-				for dev_p in 1:pre_p - 1																	# get exogenous deviation price (out of equilibrium)
-					# generate impulse response for converged session z, with deviating agent dev_agent and at episode dev_t of convergence cycle with dev_p
-					new_cycle_prices, shock_profits, post_profits, 
-					new_cycle_profits, new_cycle_length = gen_individual_ir(last_memory[:,z], greedy_policy[:,:,z], dev_agent, dev_p, dev_t,
-																			shock_prices_, shock_profits_, post_prices_, post_profits_, visited_states_)[3:end]
-					returned_to_cycle = is_returned_to_cycle(pre_prices[z], new_cycle_prices, cycle_length[z], new_cycle_length)
-					dev_gains = get_deviation_gains(circshift(pre_profits[z],-(dev_t-1)), shock_profits[dev_t:end,:], post_profits, new_cycle_profits, cycle_length[z], new_cycle_length)
-					append!(dev_matrix[pre_p][dev_p], dev_gains[dev_agent])
-					append!(ret_matrix[pre_p][dev_p], returned_to_cycle) 
+	visited_states_ = Array{Int32,2}(undef, max_cycle_length, n_agents)	
+	on_path_Q_error = zeros(n_agents, n_sessions)
+	d_profits = Array{Float64}(undef, n_prices);	
+	for z in 1:n_sessions
+		for i in 1:n_agents                                                                     	# loop over shocking agent                   
+			for t in 1:cycle_length[z]                                                             		# loop over episodes in cycle
+				for p in 1:n_prices
+					shock_profits, pre_cycle_profits, cycle_profits_, 
+					cycle_length_ = gen_individual_ir(copy(last_memory[:,:,z]), greedy_policy[:,:,z], i, p, t, shock_prices_, shock_profits_, 
+														post_prices_, post_profits_, visited_states_, dev_length = 1)[4:end]
+					d_profits[p] = get_d_profits(shock_profits[t:end,:], pre_cycle_profits, cycle_profits_, cycle_length_)[i]
 				end
+				on_path_Q_error[i,z] += mean(abs.((Q[copy(last_memory[:,:,z])[i],:,i,z] - d_profits)./ Q[copy(last_memory[:,:,z])[i],:,i,z])) ./ cycle_length[z]       
 			end
 		end
 	end
-	dev_gains_matrix = fill((NaN,NaN), n_prices, n_prices)
-	returned_to_cycle_matrix = fill(NaN, n_prices, n_prices)
-	share_unprofitable_matrix = fill(NaN, n_prices, n_prices)
-	for pre_p in 1:n_prices
-		for dev_p in 1:pre_p-1
-			!isempty(dev_matrix[pre_p][dev_p]) || continue
-			dev_gains_matrix[dev_p,pre_p] = mean_se(dev_matrix[pre_p][dev_p])[1]
-			share_unprofitable_matrix[dev_p,pre_p] = mean(dev_matrix[pre_p][dev_p] .<= 0)
-			returned_to_cycle_matrix[dev_p,pre_p] = mean(ret_matrix[pre_p][dev_p])
-		end
-	end
-	return dev_gains_matrix, returned_to_cycle_matrix, share_unprofitable_matrix
-end
+	# compute percentage gains from dynamic best response
+	dev_gains = gen_impulse_response(last_memory, greedy_policy, cycle_prices, cycle_states, cycle_profits, cycle_length, converged; dev_type = 100)[3]
+	# compute share of policy errors on path
+	on_path_policy_errors = [count(dev_gains[z][:,dev_agent,dev_agent] .> 1e-10)/(cycle_length[z]) for dev_agent in 1:n_agents, z in (1:n_sessions)[converged]]
+	# compute consequential loss on path
+	on_path_Q_losses = mean.([dev_gains[z][:,dev_agent,dev_agent] for dev_agent in 1:n_agents, z in (1:n_sessions)[converged]])
+	on_path_Q_losses[on_path_Q_losses .<= 1e-10] .= 0 	# machine zero
+	# compute nash equilibriums
+	is_nash = [all(on_path_policy_errors[:,z] .== 0) for z in 1:count(converged)]
 
+	return on_path_policy_errors, on_path_Q_losses, on_path_Q_error, is_nash
+end

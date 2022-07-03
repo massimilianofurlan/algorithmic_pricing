@@ -1,4 +1,16 @@
 
+function get_beta(nu)
+	get_intensity(beta) = 1 / (n_prices * n_states) * beta / (1 - beta^(n_agents+1))
+	beta = 0.9
+	for prec in 5:16
+		while nu - get_intensity(beta) > 10.0^-(prec+1)
+	 		beta += 10.0^-prec
+	 	end
+	 	beta -= 10.0^-prec
+	end
+	return beta
+end
+
 function gen_equilibrium_prices()
 	# compute nash and cooperation prices for symmetric fims (having the same a and c)
 	nash_price = Array{Float32,2}(undef,n_agents,n_markets)
@@ -27,39 +39,6 @@ function gen_equilibrium_prices()
 end
 
 
-function gen_equilibrium_prices_asym()
-	# compute nash and cooperation prices for asymmetric fims
-	nash_price = Array{Float32,2}(undef,n_agents,n_markets)
-	coop_price = Array{Float32,2}(undef,n_agents,n_markets)	
-	pf(p,m,mu,i) = - (p[i] - c[i]) * exp((a[i] - p[i]) / mu) / (sum(exp.((a .- p) / mu)) + exp(a0[m] / mu))		# pf(p) = - \pi(p) thus argmax(\pi) = -argmin(\pi)
-	Ix(i,x) = [if i == j x else 0.0 end for j in 1:n_agents]													# I*x where I is the indicator function
-	dq(p,m,mu,i) = (pf(p .+ Ix(i,1e-8),m,mu,i) - pf(p,m,mu,i)) / 1e-8											# difference quotient for agent i 
-	jpf(p,m,mu) = - sum((p[i] - c[i]) * exp((a[i] - p[i]) / mu) for i in 1:n_agents)  / (sum(exp.((a .- p) / mu)) + exp(a0[m] / mu))		# joint profit function
-	dq(p,m,mu) = (jpf(p .+ 1e-8,m,mu) - jpf(p,m,mu)) / 1e-8														# difference quotient for agent i 
-	for m in 1:n_markets
-		# compute nash prices
-		np = Float64.(a)		
-		while true
-			np_ = copy(np)
-			for i in 1:n_agents																					# find best reply to p_{-i}, p_i = Ri(p_{-i})
-				while abs(dq(np,m,mu,i)) > 1e-9																	# iteratively solve foc ∂\pi(p_i,p_{-i})\∂p_i = 0 for all i 
-					np[i] -= 1.0e-4 * dq(np,m,mu,i)																# updating p_i each time: p_i^N = Ri(Rj(Ri(Rj(Ri(...)))))
-				end
-			end
-			any(abs.(np_ - np) .> 1e-8) || break																# break if the best reply of each agent settled														
-		end
-		# compute cooperation price
-		cp = Float64.(a)
-		while abs(dq(cp,m,mu)) .> 1e-8																			# iteratively solve foc ∇\pi(p) = 0
-			cp .-= 1.0e-4 * dq(cp,m,mu)
-		end
-		coop_price[:,m] = Float32.(round.(cp, digits=7))
-		nash_price[:,m] = Float32.(round.(np, digits=7))
-	end
-	return nash_price, coop_price
-end
-
-
 function gen_prices()
 	# compute discrete (linearly spaced) set of prices
 	# the nash price is the (p_nash)-th price, the cooperation price is the (p_coop)-th price
@@ -71,7 +50,7 @@ function gen_prices()
 		#offset = (coop_price[i,1] - nash_price[i,n_markets]) / (n_prices - p_nash[i])
 		#lower_bound = nash_price[i,n_markets] - (p_nash[i]-1) * offset
 		#upper_bound = coop_price[i,1]
-		prices[:,i] = collect(lower_bound:offset:upper_bound+0.001f0) #collect(range(lower_bound,upper_bound,n_prices))
+		prices[:,i] = collect(lower_bound:offset:upper_bound)
 	end
 	return prices
 end
@@ -127,14 +106,50 @@ end
 
 function gen_one_memory_states()
 	memory_length == 0 && return undef				# early return if memory_length = 0
-	# generate one memory states number (or strategy profile)
-	# one_memory_state asssign a unique number to any combination of prices
+	# generate coarse partition of prices
+	coarse_prices = Vector{Vector{Int8}}()
+	start_ = 1
+	for length in c_part
+	  end_ = start_ + length - 1
+	  push!(coarse_prices, price_numbers[start_:end_])
+	  start_ += length
+	end
+
+	# generate one memory (possibly coarse) states number (or strategy profile)
+	# one_memory_state asssign a unique number to any combination of prices given agent's i coarse memory
+	dims = Tuple(pushfirst!([length(c_part) for i in 1:n_agents-1], n_prices))
+	temp = Array{Int32, n_agents}(undef, dims)
+	for i in eachindex(temp)
+	  temp[i] = i
+	end
+
 	dims = ntuple(d -> n_prices, Val(n_agents))
-	one_memory_state = Array{Int32,n_agents}(undef, dims)
-	for i in eachindex(one_memory_state)
-		one_memory_state[i] = i
+	one_memory_state = Array{Array{Int32},n_agents}(undef, dims)
+	subjective_state = Array{Int32,1}(undef, n_agents)
+	for i in keys(one_memory_state)
+		p = collect(Tuple(i))
+		for i_agent in 1:n_agents
+			p_ = copy(p)
+			for j in 2:n_agents
+				p_[j] = get_coarse_price(p_[j],coarse_prices)
+			end         
+			subjective_state[i_agent] = temp[p_...]
+			p = circshift(p,-1)
+		end
+		one_memory_state[i] = copy(subjective_state)
 	end
 	return one_memory_state
+end
+
+
+function get_coarse_price(p, coarse_prices::Array{Array{Int8,1},1})
+   for p_c in eachindex(coarse_prices)
+      for p_ in eachindex(coarse_prices[p_c])
+         if p == coarse_prices[p_c][p_]
+            return p_c
+         end
+      end
+   end
 end
 
 
@@ -176,14 +191,16 @@ function get_one_memory_state(p::Array{Int8})
 end
 
 
-function get_state_number(memory::Array{Int32,1})
+function get_state_number(memory::Array{Int32,2})
 	# get state number from memory
-	if memory_length == 0 							# returns always 1
-		return Int32(1)
-	elseif memory_length == 1
-		return memory[1]					# state = memory
+	if memory_length <= 1
+		return memory[:]					# state = memory
 	elseif memory_length > 1
-		return state_number[get_tuple(memory,memory_length)...]
+		state = Array{Int32,1}(undef, n_agents)
+		for i in 1:n_agents
+			state[i] = state_number[get_tuple(memory[i,:],memory_length)...] 
+		end
+		return state
 	end
 end
 

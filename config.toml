@@ -11,7 +11,7 @@ mu = 0.25
 alpha = [0.15, 0.15]
 delta = [0.95, 0.95]
 beta = [0.999996, 0.999996]
-intensity = [75.0, 75.0]
+nu = [25.0, 25.0]
 eps0 = [1.0, 1.0]
 q_init_mode = ["expected_payoff", "expected_payoff"]
 
@@ -20,8 +20,8 @@ n_prices = 15
 p_nash = [2,2]
 memory_length = 1
 
-n_sessions = 200
-max_epochs = 500
+n_sessions = 1000
+max_epochs = 520
 n_episodes = 10000
 convergence_target = 20
 
@@ -29,6 +29,9 @@ convergence_target = 20
 ir_ext = 4
 dev_type = 0
 dev_length = 1
+
+# coarse memory
+c_part = [5,5,5]
 
 
 [three_agents]
@@ -42,8 +45,7 @@ mu = 0.25
 # Q-agents 
 alpha = [0.15, 0.15, 0.15]
 delta = [0.95, 0.95, 0.95]
-beta = [0.999996, 0.999996, 0.999996]
-intensity = [0.0, 0.0, 0.0]
+beta = [0.96, 0.96, 0.96]
 eps0 = [1.0, 1.0, 1.0]
 q_init_mode = ["expected_payoff", "expected_payoff", "expected_payoff"]
 
@@ -61,6 +63,14 @@ convergence_target = 20
 ir_ext = 4
 dev_type = 0
 dev_length = 1
+
+# coarse memory
+c_part = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+
+# market delivery
+alpha_mkt = [0.25, 0.25, 0.25]
+beta_mkt = [0.95, 0.95, 0.95]
+eps0_mkt = [0.01, 0.01, 0.01]
 
 
 [four_agents]
@@ -92,4 +102,13 @@ convergence_target = 20
 ir_ext = 4
 dev_type = 0
 dev_length = 1
+
+# coarse memory
+c_part = [16]
+
+# market delivery
+alpha_mkt = [0.25, 0.25, 0.25, 0.25]
+beta_mkt = [0.95, 0.95, 0.95, 0.95]
+eps0_mkt = [0.01, 0.01, 0.01, 0.01]
+
 

@@ -2,15 +2,16 @@ using Statistics
 using JLD
 using PGFPlotsX
 
+
 function generate_tikz_plots(;results = undef)
 	println("loading results...")
 	if in_session == true
 		last_epoch, greedy_policy, epoch_profits, converged, 
 		cycle_prices, cycle_length, profit_gains, 
 		indiv_ir_price, dev_gains, aggr_ir_price = getindex.(Ref(results),
-		["last_epoch", "greedy_policy", "epoch_profits", "converged",
-		"cycle_prices", "cycle_length", "profit_gains", 
-		"indiv_ir_price", "dev_gains", "aggr_ir_price"])
+			["last_epoch", "greedy_policy", "epoch_profits", "converged",
+			"cycle_prices", "cycle_length", "profit_gains", 
+			"indiv_ir_price", "dev_gains", "aggr_ir_price"])
 	else
 		last_epoch, greedy_policy, epoch_profits, converged, 
 		cycle_prices, cycle_length, profit_gains, 
@@ -20,9 +21,10 @@ function generate_tikz_plots(;results = undef)
 			"indiv_ir_price", "dev_gains", "aggr_ir_price")
 	end
 	n_converged = sum(converged)
+
 	println("generating tikz plots... (be patient)")
 	isdir("output/tikz") || run(`mkdir -p output/tikz`)
-	subset = rand((1:n_sessions)[converged], 12)
+	subset = rand((1:n_sessions)[converged], 9)
 	open("output/subset.txt","w") do io println(io, subset) end
 	tikz_plot_hm(converged, cycle_length, cycle_prices)
 	tikz_plot_aggr_ir(n_converged, aggr_ir_price)
@@ -33,8 +35,16 @@ end
 
 
 function tikz_plot_hm(converged, cycle_length, cycle_prices)
-	# plot heatmap of prices visited at convergence (only converged sessions are considered)
-	price_numbers = collect(1:n_prices)
+	# plot heatmap of prices visited at convergence (only converged sessions are considered)	
+	
+	if length(c_part) > 1 && length(c_part) < n_prices
+		cuts = zeros(Int64,length(c_part)-1)
+		cuts[1] = c_part[1]
+		for i in 2:length(c_part)-1
+			cuts[i] = cuts[i-1] + c_part[i]
+		end
+	end
+
 	if n_agents <= 2 												# cannot do an n-dimensional heatmpas with n > 2 
 		dims = Tuple([n_prices for i in 1:n_agents])
 		heatmap_prices = zeros(Int64,dims)
@@ -50,11 +60,14 @@ function tikz_plot_hm(converged, cycle_length, cycle_prices)
 		coord = Coordinates(x, y; meta = meta)
 		axis = @pgf Axis(
 		    {
+		    	xlabel= raw"Agent $1$",
+		    	ylabel= raw"Agent $2$", 
 		        enlargelimits = false,
 		        xtick = price_numbers,
 		        ytick = price_numbers,
 		        yticklabels = [string(i) for i in n_prices:-1:1],
-		        colorbar,"colormap/jet",
+		        "colorbar horizontal",
+		        "colormap/jet",
 		    },
 		    PlotInc(
 		        {
@@ -64,8 +77,30 @@ function tikz_plot_hm(converged, cycle_length, cycle_prices)
 		            "mesh/cols" = n_prices
 		        },
 		        coord,
-		    )
+		    ),
+		    [raw"\draw[thick, red, dashed] (axis cs: 2.5,13.5) rectangle (axis cs: 1.5,14.5);"],
+        	[raw"\draw[thick, red, dashed] (axis cs: 13.5,2.5) rectangle (axis cs: 14.5,1.5);"]
 		)
+		if length(c_part) > 1 && length(c_part) < n_prices
+			@pgf for cut in cuts
+			    pl = Plot(
+			    	{
+			            color = "green!30!lightgray",
+			            dashed
+			        },
+			        Coordinates([(0.5, cut+0.5),(15.5, cut+0.5)]),
+			    ) 	
+				push!(axis, pl)
+				pl = Plot(
+			    	{
+			            color = "green!30!lightgray",
+			            dashed
+			        },
+			        Coordinates([(cut+0.5,0.5),(cut+0.5,15.5)])
+			    ) 	
+				push!(axis, pl)
+			end
+		end
 		pgfsave("output/hm.pdf", axis)
 		pgfsave("output/tikz/hm.tikz", axis)
 	end
@@ -120,12 +155,20 @@ function tikz_plot_aggr_ir(n_converged, aggr_ir_price)
 end
 
 
-function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set)	
+function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set, show_cuts = true)	
 	expected_nash_price = mean(nash_price, dims = 2)
 	expected_coop_price = mean(coop_price, dims = 2)
 	col = ["blue", "red", "green!90!lightgray", "orange"]
 	dev_agent = 2
 	dev_t = 1
+
+	# save information structure cuts (works only if agents have the same prices)
+	cuts = zeros(Int64,length(c_part))
+	cuts[1] = c_part[1]
+	for i in 2:length(c_part)
+		cuts[i] = cuts[i-1] + c_part[i]
+	end
+	float_cut = prices[cuts,1] .+ (prices[2,1] - prices[1,1])/2
 
 	axs = []
 	for z in set
@@ -148,14 +191,18 @@ function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set)
 		       	xmin = 0.8, xmax = string(ir_len,".2"),
 		        height = "7cm", width = "12cm",
 		    },
-		    HLine({ dashed, blue!50!darkgray }, nash_price[1]),
-		    HLine({ dashed, blue!50!darkgray }, coop_price[1]),
-		    HLine({ dashed, red!50!darkgray }, nash_price[2]),
-		    HLine({ dashed, red!50!darkgray }, coop_price[2]),
+		    HLine({ dashed, black!30!darkgray }, expected_nash_price[1]),
+		    HLine({ dashed, black!30!darkgray }, expected_coop_price[1]),
 		    VLine({ dashed, gray }, cycle_length[z]*ir_ext+dev_t),
 			[raw"\node [draw,above left] at (current bounding box.south east) {",dev_gains_,"};"]
 
 		);
+
+		if length(c_part) < n_prices
+			@pgf for i in keys(float_cut) 
+				show_cuts == true && push!(ax, HLine({ dashed, green!30!lightgray, thick }, float_cut[i]))
+			end
+		end
 
 		@pgf for i in 1:n_agents
 		    pl = Plot(
@@ -177,7 +224,7 @@ function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set)
 	end
 
 	group_ax = @pgf GroupPlot(
-    { group_style = { group_size="4 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
+    { group_style = { group_size="3 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
 		xlabel=raw"$x$",
     }, axs...)
 
@@ -186,7 +233,7 @@ function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set)
 end
 
 
-function tikz_plot_aggr_pg(last_epoch, epoch_profits)
+function tikz_plot_aggr_pg(last_epoch, epoch_profits; beta = beta, eps0 = 1.0)
 	max_last_epoch = trunc(Int, mean(last_epoch) + std(last_epoch))
 	profit_gains_ext = Array{Float64,3}(undef, max_last_epoch, n_agents, n_sessions)
 	for z in 1:n_sessions
@@ -267,7 +314,7 @@ function tikz_plot_pg_group(last_epoch, epoch_profits, set)
 		push!(axs, ax)
 	end
 	group_ax = @pgf GroupPlot(
-    { group_style = { group_size="4 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
+    { group_style = { group_size="3 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
 		xlabel=raw"$x$",
     }, axs...)
 	pgfsave("output/pg_group.pdf",group_ax)
@@ -285,6 +332,7 @@ if in_session == false
 	const n_prices = config["n_prices"]
 	const p_nash = config["p_nash"]
 	const p_coop = n_prices .- p_nash .+ 1
+	const c_part = config["c_part"]
 	const n_sessions = config["n_sessions"]
 	const max_epochs = config["max_epochs"]
 	const n_episodes = config["n_episodes"]
@@ -293,3 +341,4 @@ if in_session == false
 	const n_states = n_prices^(n_agents*memory_length)
 	generate_tikz_plots()
 end
+

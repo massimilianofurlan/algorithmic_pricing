@@ -1,5 +1,6 @@
-# Algorithmic pricing 
-Replication of "Artificial intelligence, algorithmic pricing and collusion," American Economic Review, 2020
+# Algorithmic pricing with coarse memory
+
+Agents perfectly remember their own past prices, but have limited memory their rival's past prices.
 
 ### Dependencies (Julia): 
 

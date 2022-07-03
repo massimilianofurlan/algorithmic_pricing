@@ -1,0 +1,95 @@
+
+[two_agents]
+
+# demand and agents
+a = [2.0, 2.0]
+c = [1.0, 1.0]
+a0 = [0.0]
+mu = 0.25
+
+# Q-agents 
+alpha = [0.15, 0.15]
+delta = [0.95, 0.95]
+beta = [0.999996, 0.999996]
+intensity = [75.0, 75.0]
+eps0 = [1.0, 1.0]
+q_init_mode = ["expected_payoff", "expected_payoff"]
+
+# experiment
+n_prices = 15
+p_nash = [2,2]
+memory_length = 1
+
+n_sessions = 200
+max_epochs = 500
+n_episodes = 10000
+convergence_target = 20
+
+# impulse response length
+ir_ext = 4
+dev_type = 0
+dev_length = 1
+
+
+[three_agents]
+
+# demand and agents
+a = [2.0, 2.0, 2.0]
+c = [1.0, 1.0, 1.0]
+a0 = [0.0]
+mu = 0.25
+
+# Q-agents 
+alpha = [0.15, 0.15, 0.15]
+delta = [0.95, 0.95, 0.95]
+beta = [0.999996, 0.999996, 0.999996]
+intensity = [0.0, 0.0, 0.0]
+eps0 = [1.0, 1.0, 1.0]
+q_init_mode = ["expected_payoff", "expected_payoff", "expected_payoff"]
+
+# experiment
+n_prices = 15
+p_nash = [2,2,2]
+memory_length = 1
+
+n_sessions = 200
+max_epochs = 500
+n_episodes = 10000
+convergence_target = 20
+
+# impulse response length
+ir_ext = 4
+dev_type = 0
+dev_length = 1
+
+
+[four_agents]
+
+# demand and agents
+a = [2.0, 2.0, 2.0, 2.0]
+c = [1.0, 1.0, 1.0, 1.0]
+a0 = [0.0]
+mu = 0.25
+
+# Q-agents 
+alpha = [0.15, 0.15, 0.15, 0.15]
+delta = [0.95, 0.95, 0.95, 0.95]
+beta = [0.96, 0.96, 0.96, 0.96]
+eps0 = [1.0, 1.0, 1.0, 1.0]
+q_init_mode = ["expected_payoff", "expected_payoff", "expected_payoff", "expected_payoff"]
+
+# experiment
+n_prices = 15
+p_nash = [2,2,2,2]
+memory_length = 1
+
+n_sessions = 200
+max_epochs = 500
+n_episodes = 10000
+convergence_target = 20
+
+# impulse response length
+ir_ext = 4
+dev_type = 0
+dev_length = 1
+

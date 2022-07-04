@@ -1,6 +1,7 @@
 
-function convergence_analysis(last_epoch::Array{Int32,1}, last_memory::Array{Int32,2}, greedy_policy::Array{Int8,3}; n_sessions = n_sessions)
+function convergence_analysis(last_epoch::Array{Int32,1}, last_memory::Array{Int32,2}, greedy_policy::Array{Int8,3})
 	# assess convergence for each session (even non-converged ones) 	
+	max_cycle_length = Int32(n_prices)^(n_agents*memory_length) + 1							# longest possible cycle has length n_real_states + 1 (because states are subjective)
 	cycle_states = Array{Int32,2}(undef, max_cycle_length, n_sessions)
 	cycle_prices = Array{Int8,3}(undef, max_cycle_length, n_agents, n_sessions)
 	cycle_profits = Array{NTuple{n_agents,Float32},2}(undef, max_cycle_length, n_sessions)
@@ -8,7 +9,7 @@ function convergence_analysis(last_epoch::Array{Int32,1}, last_memory::Array{Int
 	profit_gains = Array{Array{Float32,2},1}(undef, n_sessions)
 
 	for z in 1:n_sessions
-		last_memory[:,z] = compute_cycles(last_memory[:,z], greedy_policy[:,:,z], view(cycle_states,:,z), view(cycle_prices,:,:,z), view(cycle_profits,:,z), view(cycle_length,z))	
+		last_memory[:,z] = compute_cycles(last_memory[:,z], greedy_policy[:,:,z], view(cycle_states,:,z), view(cycle_prices,:,:,z), view(cycle_profits,:,z), view(cycle_length,z), max_cycle_length)	
 		profit_gains[z] = compute_profit_gains(cycle_profits[:,z], cycle_length[z])
 	end
 	converged = [last_epoch[i] != max_epochs for i in 1:n_sessions]                     # save converged flags
@@ -17,7 +18,7 @@ function convergence_analysis(last_epoch::Array{Int32,1}, last_memory::Array{Int
 end
 
 
-function compute_cycles(memory, greedy_policy, cycle_states, cycle_prices, cycle_profits, cycle_length)
+function compute_cycles(memory, greedy_policy, cycle_states, cycle_prices, cycle_profits, cycle_length, max_cycle_length)
 	# compute states, prices and profits at convergence: arguments are passed by reference to reduce allocations
 	state = get_state_number(memory)
 	cycle_start = undef

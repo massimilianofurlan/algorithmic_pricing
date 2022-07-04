@@ -30,7 +30,6 @@ end
 
 function epoch_play(Q::Array{Float32,3}, V::Array{Float32,2}, greedy_policy::Array{Int8,2}, epsilon::Array{Array{Float64,1},1}, memory::Array{Int32,1}, p::Array{Int8,1}, alloc_max_idx::Array{Int8,1})
 	epoch_profits = zeros(Float32, n_agents)
-	#memory = init_memory()	# initialize memory each epoch (robustness)
 	state = get_state_number(memory)
 	market = Int8(rand(1:n_markets))
 	for episode in 1:n_episodes
@@ -102,7 +101,7 @@ function init_q_matrix()
 			idx = [[p_nash[i]] for i in 1:n_agents]
 			for p in 1:n_prices 
 				idx[i] = [p]
-				Q[:,p,i] .= mean(mean(getfield.(payoffs[m][idx...],i)) for m in 1:n_markets) / (1 - delta[i])
+				Q[:,p,i] .= mean(getfield.(expected_payoffs[idx...],i)) / (1 - delta[i])
 			end
 		end
 	end

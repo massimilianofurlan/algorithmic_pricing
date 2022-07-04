@@ -1,4 +1,16 @@
 
+function get_beta(nu)
+	get_intensity(beta) = 1 / (n_prices * n_states) * beta / (1 - beta^(n_agents+1))
+	beta = 0.9
+	for prec in 5:16
+		while nu - get_intensity(beta) > 10.0^-(prec+1)
+	 		beta += 10.0^-prec
+	 	end
+	 	beta -= 10.0^-prec
+	end
+	return beta
+end
+
 function gen_equilibrium_prices()
 	# compute nash and cooperation prices for symmetric fims (having the same a and c)
 	nash_price = Array{Float32,2}(undef,n_agents,n_markets)

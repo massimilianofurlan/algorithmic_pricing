@@ -22,7 +22,7 @@ function generate_tikz_plots(;results = undef)
 	n_converged = sum(converged)
 	println("generating tikz plots... (be patient)")
 	isdir("output/tikz") || run(`mkdir -p output/tikz`)
-	subset = rand((1:n_sessions)[converged], 12)
+	subset = rand((1:n_sessions)[converged], 9)
 	open("output/subset.txt","w") do io println(io, subset) end
 	tikz_plot_hm(converged, cycle_length, cycle_prices)
 	tikz_plot_aggr_ir(n_converged, aggr_ir_price)
@@ -50,11 +50,14 @@ function tikz_plot_hm(converged, cycle_length, cycle_prices)
 		coord = Coordinates(x, y; meta = meta)
 		axis = @pgf Axis(
 		    {
+		    	xlabel= raw"Agent $1$",
+		    	ylabel= raw"Agent $2$", 
 		        enlargelimits = false,
 		        xtick = price_numbers,
 		        ytick = price_numbers,
 		        yticklabels = [string(i) for i in n_prices:-1:1],
-		        colorbar,"colormap/jet",
+		        "colorbar horizontal",
+		        "colormap/jet",
 		    },
 		    PlotInc(
 		        {
@@ -177,7 +180,7 @@ function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set)
 	end
 
 	group_ax = @pgf GroupPlot(
-    { group_style = { group_size="4 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
+    { group_style = { group_size="3 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
 		xlabel=raw"$x$",
     }, axs...)
 
@@ -267,7 +270,7 @@ function tikz_plot_pg_group(last_epoch, epoch_profits, set)
 		push!(axs, ax)
 	end
 	group_ax = @pgf GroupPlot(
-    { group_style = { group_size="4 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
+    { group_style = { group_size="3 by 3", raw"vertical sep=15pt", raw"horizontal sep = 15pt" },
 		xlabel=raw"$x$",
     }, axs...)
 	pgfsave("output/pg_group.pdf",group_ax)
@@ -293,3 +296,4 @@ if in_session == false
 	const n_states = n_prices^(n_agents*memory_length)
 	generate_tikz_plots()
 end
+

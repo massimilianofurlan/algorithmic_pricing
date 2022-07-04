@@ -50,7 +50,7 @@ function gen_prices()
 		#offset = (coop_price[i,1] - nash_price[i,n_markets]) / (n_prices - p_nash[i])
 		#lower_bound = nash_price[i,n_markets] - (p_nash[i]-1) * offset
 		#upper_bound = coop_price[i,1]
-		prices[:,i] = collect(lower_bound:offset:upper_bound)
+		prices[:,i] = collect(lower_bound:offset:upper_bound+0.001f0) #collect(range(lower_bound,upper_bound,n_prices))
 	end
 	return prices
 end

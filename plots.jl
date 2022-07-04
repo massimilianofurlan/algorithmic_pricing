@@ -2,16 +2,15 @@ using Statistics
 using JLD
 using PGFPlotsX
 
-
 function generate_tikz_plots(;results = undef)
 	println("loading results...")
 	if in_session == true
 		last_epoch, greedy_policy, epoch_profits, converged, 
 		cycle_prices, cycle_length, profit_gains, 
 		indiv_ir_price, dev_gains, aggr_ir_price = getindex.(Ref(results),
-			["last_epoch", "greedy_policy", "epoch_profits", "converged",
-			"cycle_prices", "cycle_length", "profit_gains", 
-			"indiv_ir_price", "dev_gains", "aggr_ir_price"])
+		["last_epoch", "greedy_policy", "epoch_profits", "converged",
+		"cycle_prices", "cycle_length", "profit_gains", 
+		"indiv_ir_price", "dev_gains", "aggr_ir_price"])
 	else
 		last_epoch, greedy_policy, epoch_profits, converged, 
 		cycle_prices, cycle_length, profit_gains, 
@@ -21,7 +20,6 @@ function generate_tikz_plots(;results = undef)
 			"indiv_ir_price", "dev_gains", "aggr_ir_price")
 	end
 	n_converged = sum(converged)
-
 	println("generating tikz plots... (be patient)")
 	isdir("output/tikz") || run(`mkdir -p output/tikz`)
 	subset = rand((1:n_sessions)[converged], 9)
@@ -191,8 +189,10 @@ function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set, show_c
 		       	xmin = 0.8, xmax = string(ir_len,".2"),
 		        height = "7cm", width = "12cm",
 		    },
-		    HLine({ dashed, black!30!darkgray }, expected_nash_price[1]),
-		    HLine({ dashed, black!30!darkgray }, expected_coop_price[1]),
+		    HLine({ dashed, blue!50!darkgray }, nash_price[1]),
+		    HLine({ dashed, blue!50!darkgray }, coop_price[1]),
+		    HLine({ dashed, red!50!darkgray }, nash_price[2]),
+		    HLine({ dashed, red!50!darkgray }, coop_price[2]),
 		    VLine({ dashed, gray }, cycle_length[z]*ir_ext+dev_t),
 			[raw"\node [draw,above left] at (current bounding box.south east) {",dev_gains_,"};"]
 
@@ -233,7 +233,7 @@ function tikz_plot_ir_group(indiv_ir_price, cycle_length, dev_gains, set, show_c
 end
 
 
-function tikz_plot_aggr_pg(last_epoch, epoch_profits; beta = beta, eps0 = 1.0)
+function tikz_plot_aggr_pg(last_epoch, epoch_profits)
 	max_last_epoch = trunc(Int, mean(last_epoch) + std(last_epoch))
 	profit_gains_ext = Array{Float64,3}(undef, max_last_epoch, n_agents, n_sessions)
 	for z in 1:n_sessions

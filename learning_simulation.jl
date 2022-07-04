@@ -1,5 +1,5 @@
 
-function learning_simulation(z::Int64; Q = init_q_matrix(), epsilon = epsilon, alpha = alpha, seed = Random.seed!(z))
+function learning_simulation(z::Int64; seed = Random.seed!(z))
 	# pre-allocate arrays, increases performance and reduces allocations
 	alloc_p = Array{Int8,1}(undef, n_agents)
 	alloc_max_idx = Array{Int8,1}(undef, n_prices)
@@ -8,10 +8,11 @@ function learning_simulation(z::Int64; Q = init_q_matrix(), epsilon = epsilon, a
 	same_greedy_policy = 0
 	epoch_profits = Array{Float32,2}(undef, max_epochs, n_agents)
 	# begin simulation
+	Q = init_q_matrix()
 	V, greedy_policy = init_greedy_policy(Q, alloc_max_idx)
 	memory = init_memory()
 	for epoch in 1:max_epochs
-		new_greedy_policy, epoch_profits[epoch,:] = epoch_play(Q, V, copy(greedy_policy), alpha, epsilon[epoch], memory, alloc_p, alloc_max_idx)
+		new_greedy_policy, epoch_profits[epoch,:] = epoch_play(Q, V, copy(greedy_policy), epsilon[epoch], memory, alloc_p, alloc_max_idx)
 		if isequal(greedy_policy, new_greedy_policy)
 			same_greedy_policy += 1
 			if same_greedy_policy == convergence_target
@@ -27,7 +28,7 @@ function learning_simulation(z::Int64; Q = init_q_matrix(), epsilon = epsilon, a
 end
 
 
-function epoch_play(Q::Array{Float32,3}, V::Array{Float32,2}, greedy_policy::Array{Int32,2}, alpha::Array{Float32,1}, epsilon::Array{Array{Float64,1},1}, memory::Array{Int32,2}, p::Array{Int8,1}, alloc_max_idx::Array{Int8,1})
+function epoch_play(Q::Array{Float32,3}, V::Array{Float32,2}, greedy_policy::Array{Int32,2}, epsilon::Array{Array{Float64,1},1}, memory::Array{Int32,2}, p::Array{Int8,1}, alloc_max_idx::Array{Int8,1})
 	epoch_profits = zeros(Float32, n_agents)
 	state = get_state_number(memory)
 	market = Int8(rand(1:n_markets))
@@ -35,7 +36,7 @@ function epoch_play(Q::Array{Float32,3}, V::Array{Float32,2}, greedy_policy::Arr
 		p = get_price(state, greedy_policy, epsilon[episode], p = p)
 		profits = get_profits(market, p)
 		next_state = get_next_state(memory, p)
-		Q = update_q(Q, V, alpha, state, p, profits, next_state, greedy_policy, alloc_max_idx)
+		Q = update_q(Q, V, state, p, profits, next_state, greedy_policy, alloc_max_idx)
 		state = next_state
 		epoch_profits .+= profits
 	end
@@ -43,7 +44,7 @@ function epoch_play(Q::Array{Float32,3}, V::Array{Float32,2}, greedy_policy::Arr
 end
 
 
-function update_q(Q::Array{Float32,3}, V::Array{Float32,2}, alpha::Array{Float32,1}, state::Array{Int32,1}, price::Array{Int8,1}, profits::Tuple, next_state::Array{Int32,1}, greedy_policy::Array{Int32,2}, alloc_max_idx::Array{Int8,1})
+function update_q(Q::Array{Float32,3}, V::Array{Float32,2}, state::Array{Int32,1}, price::Array{Int8,1}, profits::Tuple, next_state::Array{Int32,1}, greedy_policy::Array{Int32,2}, alloc_max_idx::Array{Int8,1})
 	# Q-learning update:  Q(s,a) <- (1 - alpha) * Q(s,a) + alpha * (R + gamma * V(s')) 
 	#                     where V(s') = max_{a in A} Q(s',a) is the continuation value (value function)
 	for i in 1:n_agents

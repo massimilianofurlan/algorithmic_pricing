@@ -48,45 +48,48 @@ end
 
 function txt_write(converged, last_epoch, profit_gains, mean_dev_gains, cycle_length, returned_to_cycle, on_path_policy_errors, on_path_Q_losses, on_path_Q_error, is_nash)
 	for sub in [[converged, "converged"], [.!converged, "not_converged"]]
-		if count(sub[1]) != 0
-			subset, subset_name = sub[1], sub[2]
-			share = mean(sub[1])																				# share of converged/non_converged sessions
-			avg_last_epoch = mean_se(last_epoch[subset].-convergence_target)[1]														# average number of episodes to reach convergence
-			quartile_last_epoch = quantile!(last_epoch[subset].-convergence_target,[0, 0.25, 0.5, 0.75, 1])							# quantiles of the numbers of episodes to reach convergence
-			agents_profit_gain = mean_se(mean.(profit_gains[subset], dims = 1))									# get average profit gain for each agent across all (subset) sessions
-			overall_profit_gain = mean_se(mean.(profit_gains[subset]))[1]										# get average profit gain across all agents and (subset) sessions
-			quartile_profit_gain = quantile!(mean.(profit_gains[subset]),[0, 0.25, 0.5, 0.75, 1]) 				# quantiles of average profit gain for each session across all agent
-			aggr_dev_gains = mean_se(mean_dev_gains[subset])[1]													# get average deviation gain/loss from deviation, across each session
-			avg_cycle_length = mean_se(cycle_length)[1]
-			dist_cycle_length = [count(x->x==i,cycle_length) for i in 1:maximum(cycle_length[subset])]			# get cycle length absolute frequencies
-			share_returned_to_cycle = mean(all.(returned_to_cycle[subset]))										# get share of (subset) sessions in which the deviation (for all dev_t and dev_agent) did not breaks convergence
-			avg_on_path_policy_errors = mean_se(on_path_policy_errors)[1]
-			avg_on_path_Q_losses = mean_se(on_path_Q_losses[on_path_Q_losses .> 1e-10])[1]
-			avg_on_path_Q_error = mean_se(on_path_Q_error)[1]			
-			avg_is_nash = mean(is_nash)[1]			
-			open("output/experiment_results.txt","a") do io
-				println(io, "($subset_name)")
-				#
-				println(io, "share $subset_name sessions: \t\t", share)
-				#
-				print(io, "average epochs to convergence: \t\t", round(Float64(avg_last_epoch[1]), digits = 2))
-				println(io, "  (", round(Float64(avg_last_epoch[2]), digits = 2), ")")
-				println(io, "epochs to convergence (quantiles): \t", quartile_last_epoch)
-				###
-				for i in 1:n_agents
-					print(io, "average profit gain of agent $i: \t", round.(Float64(agents_profit_gain[i][1]), digits = 5))
-					println(io, "  (", round.(Float64(agents_profit_gain[i][2]), digits = 5), ")")
-				end
-				print(io, "average profit gain across agents: \t", round.(Float64.(collect(overall_profit_gain[1])), digits = 5))
-				println(io, "  (", round.(Float64.(collect(overall_profit_gain[2])), digits = 5), ")")
-				println(io, "average profit gains (quantiles): \t", round.(quartile_profit_gain, digits = 5))
-				print(io, "average cycle length: \t\t\t", round(Float64(avg_cycle_length[1]), digits = 2))
-				println(io, "  (", round(Float64(avg_cycle_length[2]), digits = 2), ")")
-				println(io, "cycle length distribution: \t\t", dist_cycle_length/length(cycle_length))
-				###
-				print(io, "average percent deviation gain: \t", round.(aggr_dev_gains[1], digits = 5))
-				println(io, "  (", round.(Float64(aggr_dev_gains[2]), digits = 5), ")")
-				println(io, "share returned to cycle: \t\t", round.(share_returned_to_cycle, digits = 5))
+		count(sub[1]) != 0 || continue
+		subset, subset_name = sub[1], sub[2]
+		share = mean(sub[1])																				# share of converged/non_converged sessions
+		avg_last_epoch = mean_se(last_epoch[subset].-convergence_target)[1]														# average number of episodes to reach convergence
+		quartile_last_epoch = quantile!(last_epoch[subset].-convergence_target,[0, 0.25, 0.5, 0.75, 1])							# quantiles of the numbers of episodes to reach convergence
+		agents_profit_gain = mean_se(mean.(profit_gains[subset], dims = 1))									# get average profit gain for each agent across all (subset) sessions
+		overall_profit_gain = mean_se(mean.(profit_gains[subset]))[1]										# get average profit gain across all agents and (subset) sessions
+		quartile_profit_gain = quantile!(mean.(profit_gains[subset]),[0, 0.25, 0.5, 0.75, 1]) 				# quantiles of average profit gain for each session across all agent
+		aggr_dev_gains = mean_se(mean_dev_gains[subset])[1]													# get average deviation gain/loss from deviation, across each session
+		avg_cycle_length = mean_se(cycle_length[subset])[1]
+		dist_cycle_length = [count(x->x==i,cycle_length[subset]) for i in 1:maximum(cycle_length[subset])]			# get cycle length absolute frequencies
+		share_returned_to_cycle = mean(all.(returned_to_cycle[subset]))										# get share of (subset) sessions in which the deviation (for all dev_t and dev_agent) did not breaks convergence
+		avg_on_path_policy_errors = mean_se(on_path_policy_errors)[1]
+		avg_on_path_Q_losses = mean_se(on_path_Q_losses[on_path_Q_losses .> 1e-10])[1]
+		avg_on_path_Q_error = mean_se(on_path_Q_error)[1]			
+		avg_is_nash = mean(is_nash)[1]			
+		open("output/experiment_results.txt","a") do io
+			println(io, "\n[experiment results]")
+			println(io, "($subset_name)")
+			#
+			println(io, "share $subset_name sessions: \t\t", share)
+			#
+			print(io, "average epochs to convergence: \t\t", round(Float64(avg_last_epoch[1]), digits = 2))
+			println(io, "  (", round(Float64(avg_last_epoch[2]), digits = 2), ")")
+			println(io, "epochs to convergence (quantiles): \t", quartile_last_epoch)
+			###
+			for i in 1:n_agents
+				print(io, "average profit gain of agent $i: \t", round.(Float64(agents_profit_gain[i][1]), digits = 5))
+				println(io, "  (", round.(Float64(agents_profit_gain[i][2]), digits = 5), ")")
+			end
+			print(io, "average profit gain across agents: \t", round.(Float64.(collect(overall_profit_gain[1])), digits = 5))
+			println(io, "  (", round.(Float64.(collect(overall_profit_gain[2])), digits = 5), ")")
+			println(io, "average profit gains (quantiles): \t", round.(quartile_profit_gain, digits = 5))
+			print(io, "average cycle length: \t\t\t", round(Float64(avg_cycle_length[1]), digits = 2))
+			println(io, "  (", round(Float64(avg_cycle_length[2]), digits = 2), ")")
+			println(io, "cycle length distribution: \t\t", dist_cycle_length/length(cycle_length))
+			###
+			print(io, "average percent deviation gain: \t", round.(aggr_dev_gains[1], digits = 5))
+			println(io, "  (", round.(Float64(aggr_dev_gains[2]), digits = 5), ")")
+			println(io, "share returned to cycle: \t\t", round.(share_returned_to_cycle, digits = 5))
+			###
+			if subset_name == "converged"
 				print(io, "average percent Q-error on path: \t", round.(avg_on_path_Q_error[1], digits = 5))
 				println(io, "  (", round.(avg_on_path_Q_error[2], digits = 5), ")")
 				print(io, "share policy errors on path: \t\t", round.(avg_on_path_policy_errors[1], digits = 5))
@@ -95,8 +98,8 @@ function txt_write(converged, last_epoch, profit_gains, mean_dev_gains, cycle_le
 				println(io, "  (", round.(avg_on_path_Q_losses[2], digits = 5), ")")
 				#println(io, ", ", round.(on_path_Q_losses[2], digits = 5))
 				print(io, "share of Nash equilibria: \t\t", round.(avg_is_nash, digits = 5))
-				println(io)
 			end
+			println(io)
 		end
 	end	
 	run(`cat output/experiment_results.txt`)
@@ -116,7 +119,6 @@ function save_results(last_memory, last_epoch, greedy_policy, Q, epoch_profits, 
 					indiv_ir_price, aggr_ir_price, dev_gains, returned_to_cycle,
 					on_path_policy_errors, on_path_Q_losses, on_path_Q_error, is_nash)
 	results = Dict(
-				#convergence  
 				"last_memory"=> last_memory, 
 				"last_epoch"=> last_epoch, 
 				"greedy_policy"=> greedy_policy, 
@@ -132,7 +134,6 @@ function save_results(last_memory, last_epoch, greedy_policy, Q, epoch_profits, 
 				"aggr_ir_price"=> aggr_ir_price,
 				"dev_gains"=> dev_gains,
 				"returned_to_cycle"=> returned_to_cycle,
-				# Q-errors
 				"on_path_policy_errors" => on_path_policy_errors,
 				"on_path_Q_losses" => on_path_Q_losses,
 				"on_path_Q_error" => on_path_Q_error,
@@ -171,7 +172,6 @@ function jld_read(path)
 	last_epoch = load("$path.jld", "last_epoch")
 	greedy_policy = load("$path.jld", "greedy_policy")
 	Q = load("$path.jld", "Q")
-	#convergence 
 	epoch_profits = load("$path.jld", "epoch_profits")
 	converged = load("$path.jld", "converged")
 	cycle_states = load("$path.jld", "cycle_states")
@@ -183,25 +183,10 @@ function jld_read(path)
 	aggr_ir_price = load("$path.jld", "aggr_ir_price")
 	dev_gains = load("$path.jld", "dev_gains")
 	returned_to_cycle = load("$path.jld", "returned_to_cycle")
-	# market delivery
-	converged_mkt = load("$path.jld", "converged_mkt")
-	last_epoch_mkt = load("$path.jld", "last_epoch_mkt")
-	greedy_policy_mkt = load("$path.jld", "greedy_policy_mkt")
-	epoch_profits_mkt = load("$path.jld", "epoch_profits_mkt")
-	profit_gains_mkt = load("$path.jld", "profit_gains_mkt")
-	cycle_prices_mkt = load("$path.jld", "cycle_prices_mkt")
-	cycle_length_mkt = load("$path.jld", "cycle_length_mkt")
-	indiv_ir_price_mkt = load("$path.jld", "indiv_ir_price_mkt")
-	aggr_ir_price_mkt = load("$path.jld", "aggr_ir_price_mkt")
-	mean_dev_gains_mkt = load("$path.jld", "mean_dev_gains_mkt")
-	returned_to_cycle_mkt = load("$path.jld", "returned_to_cycle_mkt")
-
     return config, nash_price, coop_price, nash_profit, coop_profit, prices, payoffs 
     		last_memory, last_epoch, greedy_policy, Q, epoch_profits, converged, 
 			cycle_states, cycle_prices, cycle_profits, cycle_length,
-			profit_gains, indiv_ir_price, aggr_ir_price, dev_gains, returned_to_cycle,
-			converged_mkt, cycle_states_mkt, cycle_prices_mkt, cycle_profits_mkt, cycle_length_mkt,
-			profit_gains_mkt, indiv_ir_price_mkt, aggr_ir_price_mkt, dev_gains_mkt, returned_to_cycle_mkt
+			profit_gains, indiv_ir_price, aggr_ir_price, dev_gains, returned_to_cycle
 end
 
 

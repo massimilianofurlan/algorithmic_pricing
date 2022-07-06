@@ -1,6 +1,6 @@
 # Algorithmic pricing with coarse memory
 
-Agents perfectly remember their own past prices, but have limited memory their rival's past prices.
+Agents perfectly remember their own past prices, but have limited memory of their rival's past prices.
 
 ### Dependencies (Julia): 
 

@@ -17,7 +17,7 @@ Pkg.add("PGFPlotsX");
 Pkg.add("PrettyTables");
 ```
 ### Licence
-The code is released under the GNU Affero General Public License v3.0. If you find it useful, cite it as below.
+This code is released under the GNU Affero General Public License v3.0. If you find it useful, cite it as below.
 ```
 @software{Massimiliano_Algorithmic_pricing_Replication,
   author = {Massimiliano, Furlan},

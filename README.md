@@ -1,8 +1,8 @@
 # Algorithmic pricing 
-Replication of "Artificial intelligence, algorithmic pricing and collusion," American Economic Review, 2020
+Replication of [Calvano et al. (2020)](https://www.aeaweb.org/articles?id=10.1257/aer.20190623).
+
 
 ### Dependencies (Julia): 
-
 ```
 import Pkg; 
 Pkg.add("TOML"); 
@@ -15,3 +15,6 @@ Pkg.add("PGFPlotsX");
 Pkg.add("PrettyTables");
 ```
 
+### Usage:
+
+Use config.TOML to change the initial configurations of the experiment. Run ``` julia --threads=auto main.jl``` in terminal.

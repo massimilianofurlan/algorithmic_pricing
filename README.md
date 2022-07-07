@@ -3,7 +3,7 @@ Replication of [Calvano et al. (2020)](https://www.aeaweb.org/articles?id=10.125
 
 ### Usage:
 
-Install [JuliaLang](https://julialang.org). Install the required [dependencies](#dependencies). Use config.TOML to change the initial configurations of the experiment. Run ``` julia --threads=auto main.jl``` in terminal.
+Install [JuliaLang](https://julialang.org). Install the required dependencies. Use config.TOML to change the initial configurations of the experiment. Run ``` julia --threads=auto main.jl``` in terminal.
 
 ### Dependencies: 
 ```

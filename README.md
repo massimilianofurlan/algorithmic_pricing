@@ -1,9 +1,10 @@
-# Algorithmic pricing with coarse memory
+# Algorithmic pricing with coarse memory 
+Extension of [Calvano et al. (2020)](https://www.aeaweb.org/articles?id=10.1257/aer.20190623) in JuliaLang. Agents perfectly remember their own past prices, but have limited memory of their rival's past prices.
 
-Agents perfectly remember their own past prices, but have limited memory of their rival's past prices.
+### Usage
+Install [JuliaLang](https://julialang.org) and the required dependencies. Use config.TOML to change the initial configurations of the experiment. Run ``` julia --threads=auto main.jl``` in terminal.
 
-### Dependencies (Julia): 
-
+### Dependencies
 ```
 import Pkg; 
 Pkg.add("TOML"); 
@@ -14,5 +15,15 @@ Pkg.add("JLD");
 Pkg.add("Plots");
 Pkg.add("PGFPlotsX");
 Pkg.add("PrettyTables");
+```
+### Licence
+This code is released under the GNU Affero General Public License v3.0. If you find it useful, cite it as below.
+```
+@software{Massimiliano_Algorithmic_pricing_Replication,
+  author = {Massimiliano, Furlan},
+  title = {Algorithmic pricing with coarse memory of competitors' past prices.},
+  year = {2022},
+  month = {jul}
+}
 ```
 
